@@ -2,13 +2,30 @@ import pandas as pd
 import sqlite3
 
 # Paths
-csv_path = "C:\Users\aniru\Downloads\conventional_vehicles2021.csv"  # Replace with your CSV file path
-db_path = "fuel_economy.db"    # SQLite database path
+csv_path = r"C:\Users\aniru\Downloads\conventional_vehicles2021.csv"
+db_path = "fuel_economy.db"
 
 # Load CSV
 data = pd.read_csv(csv_path)
 
-# Rename columns to match database schema
+# Debug: Print the column names
+print("Column names in CSV:", data.columns.tolist())
+
+# Filter relevant columns
+data = data[[
+    "Model Year",
+    "Mfr Name",
+    "Division",
+    "Carline",
+    "Eng Displ",
+    "# Cyl",
+    "Transmission",
+    "City FE (Guide) - Conventional Fuel",
+    "Hwy FE (Guide) - Conventional Fuel",
+    "Comb FE (Guide) - Conventional Fuel"
+]]
+
+# Rename columns to match the database schema
 data.rename(columns={
     "Model Year": "model_year",
     "Mfr Name": "manufacturer",
@@ -26,7 +43,7 @@ data.rename(columns={
 connection = sqlite3.connect(db_path)
 cursor = connection.cursor()
 
-# Create table
+# Create the `conventional_vehicles` table
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS conventional_vehicles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +60,11 @@ CREATE TABLE IF NOT EXISTS conventional_vehicles (
 )
 ''')
 
-# Load data into the table
+# Insert data into the table
 data.to_sql("conventional_vehicles", connection, if_exists="replace", index=False)
+
+# Commit and close the connection
 connection.commit()
 connection.close()
+
+print("Table `conventional_vehicles` created and data loaded successfully.")

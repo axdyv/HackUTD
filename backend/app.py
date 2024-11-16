@@ -9,7 +9,7 @@ CORS(app)  # Enable Cross-Origin Resource Sharing for frontend-backend communica
 # Helper function to connect to the database
 def get_db_connection():
     connection = sqlite3.connect("fuel_economy.db")
-    connection.row_factory = sqlite3.Row  # Allows dict-like access to rows
+    connection.row_factory = sqlite3.Row  # Enables dict-like access to rows
     return connection
 
 
@@ -22,8 +22,11 @@ def get_conventional_vehicles():
     vehicles = cursor.fetchall()
     connection.close()
 
+    # Convert sqlite3.Row objects to dictionaries
     vehicles_list = [dict(vehicle) for vehicle in vehicles]
     return jsonify(vehicles_list)
+
+
 
 
 
