@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Label } from "recharts";
 import { getConventionalVehicles } from "./api";
 
 const App = () => {
@@ -99,18 +99,26 @@ const App = () => {
 
             {/* Chart Component */}
             <BarChart
-                width={800}
-                height={400}
-                data={filteredVehicles}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              width={800}
+              height={400}
+              data={filteredVehicles}
+              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
             >
-                <XAxis dataKey="carline" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="city_fuel_economy" fill="#8884d8" />
-                <Bar dataKey="highway_fuel_economy" fill="#82ca9d" />
+            <XAxis dataKey="carline" />
+              <YAxis>
+                <Label
+                  value="Fuel Economy (MPG)"
+                  angle={-90}
+                  position="insideLeft"
+                  style={{ textAnchor: "middle" }}
+                />
+              </YAxis>
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="city_fuel_economy" fill="#8884d8" />
+            <Bar dataKey="highway_fuel_economy" fill="#82ca9d" />
             </BarChart>
+
 
             {/* Table (Visible Only When Filters Are Applied or "Show All Data" is Selected) */}
             {showTable && (
