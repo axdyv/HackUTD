@@ -15,11 +15,12 @@ const App = () => {
     });
 
     const filterableColumns = [
-        { key: "manufacturer", label: "Manufacturer" },
-        { key: "model_year", label: "Model Year" },
-        { key: "engine_displacement", label: "Engine Displacement" },
-        { key: "num_cylinders", label: "Number of Cylinders" },
-        { key: "transmission", label: "Transmission" },
+        { key: "manufacturer", label: "Manufacturer", dependsOn: null },
+        { key: "model_year", label: "Model Year", dependsOn: null },
+        { key: "carline", label: "Carline", dependsOn: "manufacturer" },
+        { key: "engine_displacement", label: "Engine Displacement", dependsOn: null },
+        { key: "num_cylinders", label: "Number of Cylinders", dependsOn: null },
+        { key: "transmission", label: "Transmission", dependsOn: null },
     ];
 
     useEffect(() => {
@@ -36,18 +37,25 @@ const App = () => {
         const filtered = vehicles.filter((vehicle) =>
             filterableColumns.every(({ key }) => {
                 const selectedFilters = filters[key];
-                return selectedFilters.length === 0 || selectedFilters.includes(vehicle[key].toString());
-            }) &&
-            (filters.manufacturer.length === 0 || filters.manufacturer.includes(vehicle.manufacturer)) &&
-            (filters.carline.length === 0 || filters.carline.includes(vehicle.carline))
+                return selectedFilters.length === 0 || selectedFilters.includes(vehicle[key]?.toString());
+            })
         );
         setFilteredVehicles(filtered);
     }, [filters, vehicles]);
 
-    // Dynamically generate unique values for each column
-    const getUniqueValues = (key, filterBy) => {
-        const subset = filterBy ? vehicles.filter((v) => filterBy.includes(v.manufacturer)) : vehicles;
-        return [...new Set(subset.map((v) => v[key]?.toString() || ""))];
+    // Dynamically generate unique values for each column, considering dependencies
+    const getUniqueValues = (key) => {
+        const columnInfo = filterableColumns.find((col) => col.key === key);
+        if (columnInfo.dependsOn) {
+            const parentFilter = columnInfo.dependsOn;
+            const parentValues = filters[parentFilter];
+            if (parentValues.length === 0) return []; // No parent values selected, show no options
+            return [...new Set(vehicles
+                .filter((v) => parentValues.includes(v[parentFilter]?.toString()))
+                .map((v) => v[key]?.toString() || "")
+            )];
+        }
+        return [...new Set(vehicles.map((v) => v[key]?.toString() || ""))];
     };
 
     // Handle filter checkbox changes
@@ -57,7 +65,9 @@ const App = () => {
             [key]: prev[key].includes(value)
                 ? prev[key].filter((item) => item !== value)
                 : [...prev[key], value],
-            ...(key === "manufacturer" && { carline: [] }), // Reset carline filter if manufacturer changes
+            ...(filterableColumns
+                .filter((col) => col.dependsOn === key)
+                .reduce((acc, col) => ({ ...acc, [col.key]: [] }), {})), // Reset dependent filters
         }));
     };
 
@@ -80,40 +90,28 @@ const App = () => {
             {/* Filters */}
             <div>
                 <button onClick={resetFilters}>Show All Data</button>
-                {filterableColumns.map(({ key, label }) => (
+                {filterableColumns.map(({ key, label, dependsOn }) => (
                     <div key={key}>
                         <h3>Filter by {label}</h3>
-                        {getUniqueValues(key).map((value) => (
-                            <label key={value}>
-                                <input
-                                    type="checkbox"
-                                    value={value}
-                                    checked={filters[key].includes(value)}
-                                    onChange={() => handleFilterChange(key, value)}
-                                />
-                                {value}
-                            </label>
-                        ))}
+                        {getUniqueValues(key).length > 0 ? (
+                            getUniqueValues(key).map((value) => (
+                                <label key={value}>
+                                    <input
+                                        type="checkbox"
+                                        value={value}
+                                        checked={filters[key].includes(value)}
+                                        onChange={() => handleFilterChange(key, value)}
+                                    />
+                                    {value}
+                                </label>
+                            ))
+                        ) : (
+                            dependsOn && filters[dependsOn].length === 0 && (
+                                <p>Please select a {filterableColumns.find((col) => col.key === dependsOn).label} first.</p>
+                            )
+                        )}
                     </div>
                 ))}
-
-                {/* Carline Filter (Depends on Manufacturer) */}
-                {filters.manufacturer.length > 0 && (
-                    <div>
-                        <h3>Filter by Carline</h3>
-                        {getUniqueValues("carline", filters.manufacturer).map((value) => (
-                            <label key={value}>
-                                <input
-                                    type="checkbox"
-                                    value={value}
-                                    checked={filters.carline.includes(value)}
-                                    onChange={() => handleFilterChange("carline", value)}
-                                />
-                                {value}
-                            </label>
-                        ))}
-                    </div>
-                )}
             </div>
 
             {/* Chart */}
