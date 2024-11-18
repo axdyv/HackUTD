@@ -2,17 +2,23 @@ import pandas as pd
 import sqlite3
 
 # Paths
-csv_path = r"C:\Users\aniru\Downloads\conventional_vehicles2021.csv"
+csv_files = [
+    r"C:\Users\aniru\Downloads\conventional_vehicles2021.csv",
+    r"C:\Users\aniru\Downloads\conventional_vehicles2022.csv",
+    r"C:\Users\aniru\Downloads\conventional_vehicles2023.csv",
+    r"C:\Users\aniru\Downloads\conventional_vehicles2024.csv",
+    r"C:\Users\aniru\Downloads\conventional_vehicles2025.csv"
+]
 db_path = "fuel_economy.db"
 
-# Load CSV
-data = pd.read_csv(csv_path)
+# Load and combine CSV files
+all_data = pd.concat([pd.read_csv(file) for file in csv_files])
 
-# Debug: Print the column names
-print("Column names in CSV:", data.columns.tolist())
+# Debug: Print the column names to ensure consistency
+print("Column names in CSV:", all_data.columns.tolist())
 
 # Filter relevant columns
-data = data[[
+all_data = all_data[[
     "Model Year",
     "Mfr Name",
     "Division",
@@ -26,7 +32,7 @@ data = data[[
 ]]
 
 # Rename columns to match the database schema
-data.rename(columns={
+all_data.rename(columns={
     "Model Year": "model_year",
     "Mfr Name": "manufacturer",
     "Division": "division",
@@ -39,11 +45,11 @@ data.rename(columns={
     "Comb FE (Guide) - Conventional Fuel": "combined_fuel_economy"
 }, inplace=True)
 
-# Connect to SQLite and create table
+# Connect to SQLite and write the data
 connection = sqlite3.connect(db_path)
 cursor = connection.cursor()
 
-# Create the `conventional_vehicles` table
+# Create the table explicitly
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS conventional_vehicles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,10 +66,10 @@ CREATE TABLE IF NOT EXISTS conventional_vehicles (
 )
 ''')
 
-# Insert data into the table
-data.to_sql("conventional_vehicles", connection, if_exists="replace", index=False)
+# Insert data using to_sql (replace existing table)
+all_data.to_sql("conventional_vehicles", connection, if_exists="replace", index=False)
 
-# Commit and close the connection
+# Commit and close
 connection.commit()
 connection.close()
 

@@ -13,49 +13,59 @@ const App = () => {
         num_cylinders: [],
         transmission: [],
     });
+    const [loading, setLoading] = useState(false); // Loading state
 
-    const filterableColumns = [
-        { key: "manufacturer", label: "Manufacturer", dependsOn: null },
-        { key: "model_year", label: "Model Year", dependsOn: null },
-        { key: "carline", label: "Carline", dependsOn: "manufacturer" },
-        { key: "engine_displacement", label: "Engine Displacement", dependsOn: null },
-        { key: "num_cylinders", label: "Number of Cylinders", dependsOn: null },
-        { key: "transmission", label: "Transmission", dependsOn: null },
-    ];
+    const colors = {
+        2021: "#8884d8",
+        2022: "#82ca9d",
+        2023: "#ffc658",
+        2024: "#ff7300",
+        2025: "#a4de6c",
+    };
 
     useEffect(() => {
         const fetchData = async () => {
-            const data = await getConventionalVehicles();
-            setVehicles(data);
-            setFilteredVehicles(data);
+            setLoading(true);
+            const response = await getConventionalVehicles({
+                year: filters.model_year.join(","), // Send selected years as a comma-separated string
+                manufacturer: filters.manufacturer.join(","),
+            });
+            setVehicles(response.data);
+            setFilteredVehicles(response.data);
+            setLoading(false);
         };
         fetchData();
-    }, []);
+    }, [filters.model_year, filters.manufacturer]); // Refetch when model year or manufacturer changes
 
-    // Apply filters whenever they are updated
-    useEffect(() => {
-        const filtered = vehicles.filter((vehicle) =>
-            filterableColumns.every(({ key }) => {
-                const selectedFilters = filters[key];
-                return selectedFilters.length === 0 || selectedFilters.includes(vehicle[key]?.toString());
-            })
-        );
-        setFilteredVehicles(filtered);
-    }, [filters, vehicles]);
+    // Group data by year for the chart
+    const groupedData = () => {
+      const years = [...new Set(filteredVehicles.map((v) => v.model_year))];
+      return years.map((year) => {
+          const yearVehicles = filteredVehicles.filter((v) => v.model_year === year);
+          const cityAverage = yearVehicles.reduce((sum, v) => sum + (v.city_fuel_economy || 0), 0) / yearVehicles.length;
+          const highwayAverage = yearVehicles.reduce((sum, v) => sum + (v.highway_fuel_economy || 0), 0) / yearVehicles.length;
+  
+          return {
+              year,
+              cityFuelEconomy: parseFloat(cityAverage.toFixed(2)),
+              highwayFuelEconomy: parseFloat(highwayAverage.toFixed(2)),
+          };
+      });
+  };
+  
 
-    // Dynamically generate unique values for each column, considering dependencies
-    const getUniqueValues = (key) => {
-        const columnInfo = filterableColumns.find((col) => col.key === key);
-        if (columnInfo.dependsOn) {
-            const parentFilter = columnInfo.dependsOn;
-            const parentValues = filters[parentFilter];
-            if (parentValues.length === 0) return []; // No parent values selected, show no options
-            return [...new Set(vehicles
-                .filter((v) => parentValues.includes(v[parentFilter]?.toString()))
-                .map((v) => v[key]?.toString() || "")
-            )];
+    // Custom tooltip for the bar chart
+    const CustomTooltip = ({ active, payload, label }) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="custom-tooltip" style={{ background: "#fff", border: "1px solid #ccc", padding: "10px" }}>
+                    <p><strong>Year:</strong> {label}</p>
+                    <p><strong>City Fuel Economy:</strong> {payload[0].value} MPG</p>
+                    <p><strong>Highway Fuel Economy:</strong> {payload[1].value} MPG</p>
+                </div>
+            );
         }
-        return [...new Set(vehicles.map((v) => v[key]?.toString() || ""))];
+        return null;
     };
 
     // Handle filter checkbox changes
@@ -65,9 +75,6 @@ const App = () => {
             [key]: prev[key].includes(value)
                 ? prev[key].filter((item) => item !== value)
                 : [...prev[key], value],
-            ...(filterableColumns
-                .filter((col) => col.dependsOn === key)
-                .reduce((acc, col) => ({ ...acc, [col.key]: [] }), {})), // Reset dependent filters
         }));
     };
 
@@ -87,30 +94,35 @@ const App = () => {
         <div>
             <h1>Conventional Vehicles Fuel Economy</h1>
 
-            {/* Filters */}
+            {/* Model Year Filter */}
             <div>
-                <button onClick={resetFilters}>Show All Data</button>
-                {filterableColumns.map(({ key, label, dependsOn }) => (
-                    <div key={key}>
-                        <h3>Filter by {label}</h3>
-                        {getUniqueValues(key).length > 0 ? (
-                            getUniqueValues(key).map((value) => (
-                                <label key={value}>
-                                    <input
-                                        type="checkbox"
-                                        value={value}
-                                        checked={filters[key].includes(value)}
-                                        onChange={() => handleFilterChange(key, value)}
-                                    />
-                                    {value}
-                                </label>
-                            ))
-                        ) : (
-                            dependsOn && filters[dependsOn].length === 0 && (
-                                <p>Please select a {filterableColumns.find((col) => col.key === dependsOn).label} first.</p>
-                            )
-                        )}
-                    </div>
+                <h3>Filter by Model Year</h3>
+                {[2021, 2022, 2023, 2024, 2025].map((year) => (
+                    <label key={year}>
+                        <input
+                            type="checkbox"
+                            value={year}
+                            checked={filters.model_year.includes(year.toString())}
+                            onChange={() => handleFilterChange("model_year", year.toString())}
+                        />
+                        {year}
+                    </label>
+                ))}
+            </div>
+
+            {/* Manufacturer Filter */}
+            <div>
+                <h3>Filter by Manufacturer</h3>
+                {[...new Set(vehicles.map((v) => v.manufacturer))].map((manufacturer) => (
+                    <label key={manufacturer}>
+                        <input
+                            type="checkbox"
+                            value={manufacturer}
+                            checked={filters.manufacturer.includes(manufacturer)}
+                            onChange={() => handleFilterChange("manufacturer", manufacturer)}
+                        />
+                        {manufacturer}
+                    </label>
                 ))}
             </div>
 
@@ -118,10 +130,10 @@ const App = () => {
             <BarChart
                 width={800}
                 height={400}
-                data={filteredVehicles}
+                data={groupedData()}
                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
             >
-                <XAxis dataKey="carline" />
+                <XAxis dataKey="year" />
                 <YAxis>
                     <Label
                         value="Fuel Economy (MPG)"
@@ -130,14 +142,22 @@ const App = () => {
                         style={{ textAnchor: "middle" }}
                     />
                 </YAxis>
-                <Tooltip />
+                <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <Bar dataKey="city_fuel_economy" fill="#8884d8" />
-                <Bar dataKey="highway_fuel_economy" fill="#82ca9d" />
+                {Object.entries(colors).map(([year, color]) => (
+                    <Bar
+                        key={year}
+                        dataKey={parseInt(year) === 2021 ? "cityFuelEconomy" : "highwayFuelEconomy"}
+                        fill={color}
+                        name={`Year ${year}`}
+                    />
+                ))}
             </BarChart>
 
             {/* Table */}
-            {filteredVehicles.length > 0 && (
+            {loading ? (
+                <p>Loading...</p>
+            ) : filteredVehicles.length > 0 ? (
                 <table border="1" style={{ width: "100%", marginBottom: "20px" }}>
                     <thead>
                         <tr>
@@ -168,6 +188,8 @@ const App = () => {
                         ))}
                     </tbody>
                 </table>
+            ) : (
+                <p>No data available for the selected filters.</p>
             )}
         </div>
     );
